@@ -1,0 +1,125 @@
+import java.nio.file.Files
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING
+
+apply plugin: 'java'
+apply plugin: 'org.jetbrains.kotlin.jvm'
+
+apply from: LOGSTASH_CORE_PATH + "/../rubyUtils.gradle"
+
+// ===========================================================================
+// plugin info
+// ===========================================================================
+group                      'com.logstash' // must match the package of the main plugin class
+version                    "${file("VERSION").text.trim()}" // read from required VERSION file
+description                = "Example Kotlin filter implementation"
+pluginInfo.licenses        = ['Apache-2.0'] // list of SPDX license IDs
+pluginInfo.longDescription = "This gem is a Logstash plugin required to be installed on top of the Logstash core pipeline using \$LS_HOME/bin/logstash-plugin install gemname. This gem is not a stand-alone program"
+pluginInfo.authors         = ['Elasticsearch']
+pluginInfo.email           = ['info@elastic.co']
+pluginInfo.homepage        = "http://www.elastic.co/guide/en/logstash/current/index.html"
+pluginInfo.pluginType      = "filter"
+pluginInfo.pluginClass     = "KotlinFilterPlugin"
+pluginInfo.pluginName      = "kotlin_filter_plugin" // must match the @LogstashPlugin annotation in the main plugin class
+// ===========================================================================
+
+sourceCompatibility = 11
+targetCompatibility = 11
+
+buildscript {
+    ext.kotlin_version = '1.3.72'
+
+    repositories {
+        mavenCentral()
+        jcenter()
+    }
+
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.4'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
+shadowJar {
+    classifier = null
+}
+
+dependencies {
+    compile 'org.apache.logging.log4j:log4j-api:2.13.3'
+    compile 'org.apache.logging.log4j:log4j-core:2.13.3'
+    compile fileTree(dir: LOGSTASH_CORE_PATH, include: "build/libs/logstash-core-?.?.?.jar")
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+
+    testCompile "org.jetbrains.kotlin:kotlin-test"
+    testCompile "org.junit.jupiter:junit-jupiter-engine:5.6.2"
+    testCompile "org.jruby:jruby-complete:9.2.11.1"
+//    testCompile 'org.jruby:jruby-complete:9.2.7.0'
+}
+
+clean {
+    delete "${projectDir}/Gemfile"
+    delete "${projectDir}/" + pluginInfo.pluginFullName() + ".gemspec"
+    delete "${projectDir}/lib/"
+    delete "${projectDir}/vendor/"
+    new FileNameFinder().getFileNames(projectDir.toString(), pluginInfo.pluginFullName() + "-?.?.?.gem").each { filename ->
+        delete filename
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+task vendor(dependsOn: shadowJar) {
+    doLast {
+        String vendorPathPrefix = "vendor/jar-dependencies"
+        String projectGroupPath = project.group.replaceAll('\\.', '/')
+        File projectJarFile = file("${vendorPathPrefix}/${projectGroupPath}/${pluginInfo.pluginFullName()}/${project.version}/${pluginInfo.pluginFullName()}-${project.version}.jar")
+        projectJarFile.mkdirs()
+        Files.copy(file("$buildDir/libs/${project.name}-${project.version}.jar").toPath(), projectJarFile.toPath(), REPLACE_EXISTING)
+        validatePluginJar(projectJarFile, project.group)
+    }
+}
+
+task generateRubySupportFiles() {
+    doLast {
+        generateRubySupportFilesForPlugin(project.description, project.group, version)
+    }
+}
+
+task removeObsoleteJars() {
+    doLast {
+        new FileNameFinder().getFileNames(
+                projectDir.toString(),
+                "vendor/**/" + pluginInfo.pluginFullName() + "*.jar",
+                "vendor/**/" + pluginInfo.pluginFullName() + "-" + version + ".jar").each { f ->
+            delete f
+        }
+    }
+}
+
+task gem(dependsOn: [downloadAndInstallJRuby, removeObsoleteJars, vendor, generateRubySupportFiles]) {
+    doLast {
+        buildGem(projectDir, buildDir, pluginInfo.pluginFullName() + ".gemspec")
+    }
+}
+
+test {
+    useJUnitPlatform()
+}
+
+compileKotlin {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
+compileTestKotlin {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
