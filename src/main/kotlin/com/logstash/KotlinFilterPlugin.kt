@@ -22,10 +22,11 @@ class KotlinFilterPlugin(
 
     override fun filter(events: Collection<Event>, matchListener: FilterMatchListener): Collection<Event>? {
         events.forEach { event ->
-            val field = event.getField(sourceField)
-            if (field is String) {
-                event.setField(sourceField, field.reversed())
-                matchListener.filterMatched(event)
+            with(event.getField(sourceField)){
+                if (this is String){
+                    event.setField(sourceField, reversed())
+                    matchListener.filterMatched(event)
+                }
             }
         }
 
