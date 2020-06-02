@@ -20,5 +20,4 @@ settings.gradle
 gradle.properties
 gradlew.bat
 gradlew
-VERSION
 gradle/
