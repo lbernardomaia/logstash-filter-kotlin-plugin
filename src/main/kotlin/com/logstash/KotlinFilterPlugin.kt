@@ -3,21 +3,15 @@ package com.logstash
 import co.elastic.logstash.api.*
 
 @LogstashPlugin(name = "kotlin_filter_plugin")
-class KotlinFilterPlugin(
+class KotlinFilterPlugin @JvmOverloads constructor(
         private val filterId: String,
         private val config: Configuration,
-        private val context: Context
+        private val context: Context,
+        private var sourceField: String = config.get(SOURCE_CONFIG)
 ) : Filter {
-    private val sourceField: String
-
-    init {
-        sourceField = config.get(sourceConfig())
-    }
 
     companion object {
-        fun sourceConfig() : PluginConfigSpec<String> {
-            return PluginConfigSpec.stringSetting("source", "message")
-        }
+        val SOURCE_CONFIG : PluginConfigSpec<String> = PluginConfigSpec.stringSetting("source", "message")
     }
 
     override fun filter(events: Collection<Event>, matchListener: FilterMatchListener): Collection<Event>? {
@@ -34,7 +28,7 @@ class KotlinFilterPlugin(
     }
 
     override fun configSchema(): Collection<PluginConfigSpec<*>> {
-        return listOf(sourceConfig())
+        return listOf(SOURCE_CONFIG)
     }
 
     override fun getId(): String {
