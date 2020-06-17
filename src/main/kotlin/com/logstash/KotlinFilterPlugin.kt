@@ -27,11 +27,7 @@ class KotlinFilterPlugin @JvmOverloads constructor(
         return events
     }
 
-    override fun configSchema(): Collection<PluginConfigSpec<*>> {
-        return listOf(SOURCE_CONFIG)
-    }
+    override fun configSchema() = listOf(SOURCE_CONFIG)
 
-    override fun getId(): String {
-        return filterId
-    }
+    override fun getId() = filterId
 }
